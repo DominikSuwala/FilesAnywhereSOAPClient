@@ -172,7 +172,7 @@ def main():
     if( sys.argv[ 1 ] == '--help' or sys.argv[ 1 ] == '-h' ):
         printHelp()
         sys.exit( 0 )
-    APIkey = '0FDEF414-DB8C-4321-9FCA-A6B66A75EC55'
+    APIkey = ''
     loggedIn = False
     argsDict = {}
     i = 1
