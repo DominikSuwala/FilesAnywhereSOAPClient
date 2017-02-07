@@ -5,7 +5,7 @@ Platform-independent, tested on Python 2.7.10.
 
 ## Usage
 
-Optional parameters are enclosed in brackets.
+Optional parameters are enclosed in brackets. To switch organization IDs you will need to restart with the correct "--orgid" parameter. Switching accounts is supported if the organization ID is unchanged. It is possible to upload multiple files simultaneously.
 
 > -h - Help menu
 
