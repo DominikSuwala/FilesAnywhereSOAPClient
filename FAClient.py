@@ -9,14 +9,31 @@ import httplib
 import requests
 import sys
 import os
+import base64
+import binascii
+import threading, time
+from progress.bar import Bar
+
+
+"""
+    Reads an entire binary file
+"""
+def readFileBinary( filename ):
+    content = None
+    try:
+        with open( filename, 'rb' ) as file:
+            content = bytearray( file.read() )
+    except:
+        print( 'error: unable to read file. check filepath, permissions' )
+        return None
+
+    return content
 
 """
     Gets value of XML attribute
 """
-
 def getXMLAttribute( msg, keyName ):
     if( keyName in msg ):
-        # print msg.split( keyName + '>' )[ 1 ].split( '</' )[ 0 ]
         return msg.split( keyName + '>' )[ 1 ].split( '</' )[ 0 ]
     else:
         return None
@@ -26,14 +43,14 @@ def getXMLAttribute( msg, keyName ):
 """
 def callSOAPService( SOAPmessage, SOAPAction ):
     headers = {
-        'Content-Type' : 'application/soap+xml; charset=utf-8'
-        #'SOAPAction' : 'http://api.filesanywhere.com/' + SOAPAction
+        'Content-Type' : 'application/soap+xml; charset=utf-8',
+        'SOAPAction' : 'http://api.filesanywhere.com/' + SOAPAction
     }
     endpoint = 'https://api.filesanywhere.com/v2/fawapi.asmx'
 
     postData = SOAPmessage
     r = requests.post( endpoint, data=postData, headers=headers )
-    # print r.status_code, r.content
+
     return r.content
 
 def validateResponse( SOAPmessage ):
@@ -57,10 +74,7 @@ def AccountLogin( argsDict ):
     soapTemplate = soapTemplate.replace( '{REPLACE_ME_4}', argsDict[ '-p' ] )
     soapTemplate = soapTemplate.replace( '{REPLACE_ME_5}', argsDict[ '--iplist' ] )
 
-    # print soapTemplate
-
     response = callSOAPService( soapTemplate, 'AccountLogin' )
-    # print response
 
     if( not validateResponse( response ) ):
         print( 'Invalid login or password' )
@@ -86,8 +100,6 @@ def ListItems2( argsDict ):
     soapTemplate = soapTemplate.replace( '{REPLACE_ME_4}', '0' )
 
     response = callSOAPService( soapTemplate, 'ListItems' )
-    # print soapTemplate
-    # print response
 
     if( not validateResponse( response ) ):
         print( 'Invalid response' )
@@ -111,8 +123,6 @@ def CreateFolderRecursive( argsDict, folderName ):
     soapTemplate = soapTemplate.replace( '{REPLACE_ME_3}', folderName )
 
     response = callSOAPService( soapTemplate, 'CreateFolderRecursive' )
-    # print soapTemplate
-    # print response
 
     if( not validateResponse( response ) ):
         print( 'Invalid. Could not create folder ' + folderName )
@@ -123,28 +133,89 @@ def CreateFolderRecursive( argsDict, folderName ):
 """
     Upload a file piece-by-piece in chunks
 """
-def AppendChunk( argsDict, folderName, filename ):
+def AppendChunk( argsDict, localFilename, remoteFilename ):
 
-    uploadPath = ''
-    filename = ''
-    # chunkdata
-    # Offset
-    # bytesread
-    # islastchunk
+    rawbytes = readFileBinary( localFilename )
+    if( rawbytes == None ):
+        return ''
 
-    soapTemplate = open( 'SOAP_Templates/CreateFolderRecursive.txt' ).read()
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_1}', argsDict[ 'token' ] )
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_2}', '\\' + argsDict[ '-u' ] )
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_3}', folderName )
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_4}', argsDict[ 'token' ] )
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_5}', '\\' + argsDict[ '-u' ] )
-    soapTemplate = soapTemplate.replace( '{REPLACE_ME_6}', folderName )
+    MAX_CHUNK_BYTES = 2 ** 6 # 4 KiB
+    currentChunkRaw = None
+
+    offset = 0
+    origTemplate = open( 'SOAP_Templates/AppendChunk.txt' ).read()
+    islastchunk = '0'
+    origsize = len( rawbytes )
+
+    bar = Bar( None, fill='#', suffix='-> Uploading ' + os.path.split( localFilename )[ 1 ] + ' ' + '%(percent)d%%' )
+
+    prev = 0
+    while( len( rawbytes ) > 0 ):
+
+        currentChunkRaw = rawbytes[ : MAX_CHUNK_BYTES ]
+        rawbytes = rawbytes[ MAX_CHUNK_BYTES : ]
+
+        if( len( rawbytes ) == 0 ):
+            islastchunk = '1'
+        currentChunkBase64 = binascii.b2a_base64( currentChunkRaw )
+
+        soapTemplate = origTemplate
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_1}', argsDict[ 'token' ] )
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_2}', remoteFilename )
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_3}', currentChunkBase64 )
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_4}', str( offset ) )
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_5}', str( len( currentChunkRaw ) ) )
+        soapTemplate = soapTemplate.replace( '{REPLACE_ME_6}', islastchunk )
+
+        response = ''
+
+        fails = 0
+        while( '<ChunkAppended>true</ChunkAppended>' not in response ):
+            response = callSOAPService( soapTemplate, 'AppendChunk' )
+
+            fails += 1
+            if( fails == 5 ):
+                print( 'error: Could not upload file. Check remote filename and Internet connection' )
+                return None
+
+        offset += len( currentChunkRaw )
+        percent = 100 * offset / origsize
+        for i in range( percent - prev ):
+            bar.next()
+        prev = percent
+    print( '\n\t' + str( 100 * offset / origsize ) + '% --\tSuccessfully uploaded ' \
+        + str( offset ) + ' bytes / ' + str( origsize ) )
+    bar.finish()
 
 """
     Delete a file or folder
 """
-def DeleteItems():
-    pass
+def DeleteItems( argsDict ):
+    soapTemplate = open( 'SOAP_Templates/DeleteItems.txt' ).read()
+    # Build item to delete
+    print( 'Enter a path to delete:' )
+    name = raw_input()
+    print( 'Is this a file or folder?' )
+    fileorfolder = raw_input()
+
+    acceptable = [ 'file', 'folder' ]
+    if( fileorfolder.lower() not in acceptable ):
+        print( 'Please indicate [file,folder] for ' + name )
+        return None
+
+    buildstr = '<Item><Type>' + \
+        fileorfolder + '</Type><Path>' + \
+        name + '</Path></Item>'
+
+    soapTemplate = soapTemplate.replace( '{REPLACE_ME_1}', argsDict[ 'token' ] )
+    soapTemplate = soapTemplate.replace( '{REPLACE_ME_2}', buildstr )
+
+    response = callSOAPService( soapTemplate, 'DeleteItems' )
+
+    if( not validateResponse( response ) ):
+        print( 'Failed to delete ' + fileorfolder + ' ' + name )
+    else:
+        print( 'Successfully deleted ' + fileorfolder + ' ' + name )
 
 """
     Search files and folders
@@ -189,11 +260,9 @@ def main():
         except:
             argsDict[ sysargs[ i ].lower() ] = ''
         sysargs = sysargs[ 2: ]
-    for d in argsDict.keys():
-        pass #print d, argsDict[ d ]
 
     response = AccountLogin( argsDict )
-    # print argsDict
+
 
     actions = {
         'login' : 'Login',
@@ -226,9 +295,22 @@ def main():
         elif( choice == 'ls' ):
             ListItems2( argsDict )
         elif( choice == 'mkdir' ):
-            print 'Enter new folder name, including path'
+            print 'Enter new folder name, including path:'
             folderName = raw_input()
             CreateFolderRecursive( argsDict, folderName )
+        elif( choice == 'upload' ):
+            print 'Enter full path to local file to upload: (drag-and-drop supported)'
+            localFilename = raw_input().strip()
+            print 'Enter remote path (incl. filename): (blank will default to root\\filename'
+            remoteFilename = raw_input()
+            if( len( remoteFilename ) == 0 ):
+                remoteFilename = '\\' + argsDict[ '-u' ] + '\\' + os.path.split( localFilename )[ 1 ]
+            print remoteFilename
+            mythread = threading.Thread( target=AppendChunk, args=[ argsDict, localFilename, remoteFilename ] )
+            mythread.start()
+            # -*AppendChunk( argsDict, localFilename, remoteFilename )
+        elif( choice == 'delete' ):
+            DeleteItems( argsDict )
 
 if __name__ == '__main__':
     main()
