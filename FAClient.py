@@ -139,7 +139,7 @@ def AppendChunk( argsDict, localFilename, remoteFilename ):
     if( rawbytes == None ):
         return ''
 
-    MAX_CHUNK_BYTES = 2 ** 6 # 4 KiB
+    MAX_CHUNK_BYTES = 2 ** 12 # 4 KiB
     currentChunkRaw = None
 
     offset = 0
