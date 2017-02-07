@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+    <soap12:Body>
+        <AccountLogin xmlns="http://api.filesanywhere.com/">
+            <APIKey>{REPLACE_ME_1}</APIKey>
+            <OrgID>{REPLACE_ME_2}</OrgID>
+            <UserName>{REPLACE_ME_3}</UserName>
+            <Password>{REPLACE_ME_4}</Password>
+            <AllowedIPList>{REPLACE_ME_5}</AllowedIPList>
+            <ClientEncryptParam>{REPLACE_ME_6}</ClientEncryptParam>
+        </AccountLogin>
+    </soap12:Body>
+</soap12:Envelope>
