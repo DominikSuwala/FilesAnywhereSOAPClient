@@ -7,7 +7,7 @@ Platform-independent, tested on Python 2.7.10.
 
 First, resolve Dependencies. Then, run the SOAP client by navigating to the directory containing the file "FAClient.py" and pass the file to python. This will run on any operating system that Python 2.7.10 is supported for.
 
-> python FAClient.py -u <username> -p <password> --apikey <FilesAnywhereAPIKeyString> --orgid 50
+> python FAClient.py -u {username} -p {password} --apikey {FilesAnywhereAPIKeyString} --orgid {50}
 
 ## Usage
 
