@@ -21,7 +21,11 @@ Platform-independent, tested on Python 2.7.10.
 ## Dependencies (Python Libraries)
 > progress 1.2
 
+https://pypi.python.org/pypi/progress
+
 > requests 2.13.0
+
+http://docs.python-requests.org/en/master/
 
 ## Resolve Dependencies
 > easy_install pip
