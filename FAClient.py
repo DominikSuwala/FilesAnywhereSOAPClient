@@ -126,9 +126,11 @@ def CreateFolderRecursive( argsDict, folderName ):
 
     if( not validateResponse( response ) ):
         print( 'Invalid. Could not create folder ' + folderName )
+        return False
     else:
         print( 'Successfully created folder "' + folderName + '"' )
 
+    return True
 
 """
     Upload a file piece-by-piece in chunks
@@ -311,6 +313,17 @@ def main():
             # -*AppendChunk( argsDict, localFilename, remoteFilename )
         elif( choice == 'delete' ):
             DeleteItems( argsDict )
+
+
+def functionalTests():
+    getXMLAttributeInput = ( '<xml><key1>Value1</key1></xml>', 'key1' )
+    getXMLAttributeExpectedOut = 'Value1'
+    print 'getXMLAttribute', \
+        'PASS' if( getXMLAttribute( getXMLAttributeInput ) == getXMLAttributeExpectedOut ) \
+        else 'FAIL'
+
+
+
 
 if __name__ == '__main__':
     main()
